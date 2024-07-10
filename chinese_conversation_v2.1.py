@@ -2,8 +2,6 @@ import streamlit as st
 from anthropic import Anthropic
 from datetime import datetime
 import os
-import tempfile
-import webbrowser
 
 # API 키를 st.secrets에서 가져옵니다
 ANTHROPIC_API_KEY = st.secrets["ANTHROPIC_API_KEY"]
@@ -63,21 +61,37 @@ def generate_content_anthropic(model, query, max_tokens, temperature, language, 
 
 # 입력과 출력을 로그에 기록하는 함수
 def log_interaction(input_data, output_data):
-    with open("interaction_log.txt", "a", encoding="utf-8") as log_file:
-        log_file.write(f"{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
-        log_file.write(f"입력: {input_data}\n")
-        log_file.write(f"출력: {output_data}\n")
-        log_file.write("\n")
-
+    log_entry = f"{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n"
+    log_entry += f"입력:\n"
+    log_entry += f"장소: {input_data['place']}\n"
+    log_entry += f"상황: {input_data['situation']}\n"
+    log_entry += f"역할: {input_data['role']}\n"
+    log_entry += f"레벨: {input_data['level']}\n\n"
+    log_entry += f"출력:\n{output_data}\n\n"
+    
+    if 'log_content' not in st.session_state:
+        st.session_state.log_content = ""
+    st.session_state.log_content += log_entry
 
 # 대화 내용 다운로드 함수
 def download_conversation():
-    temp_dir = tempfile.gettempdir()
-    file_path = os.path.join(temp_dir, "conversation_log.txt")
-    with open(file_path, "w", encoding="utf-8") as f:
-        with open("interaction_log.txt", "r", encoding="utf-8") as log_file:
-            f.write(log_file.read())
-    webbrowser.open(file_path)
+    if 'log_content' in st.session_state and st.session_state.log_content:
+        log_content = st.session_state.log_content
+    else:
+        log_content = "로그가 아직 생성되지 않았습니다."
+    
+    # 사용자의 문서 폴더 경로
+    documents_path = os.path.expanduser("~/Documents")
+    file_path = os.path.join(documents_path, "conversation_log.txt")
+    
+    # 파일에 로그 내용 추가 (이어쓰기)
+    with open(file_path, "a", encoding="utf-8") as f:
+        f.write(log_content)
+    
+    # 파일 열기
+    os.startfile(file_path)
+    
+    st.success(f"로그가 {file_path}에 저장되었고 자동으로 열렸습니다.")
 
 # Streamlit 앱 레이아웃 설정
 st.title("중국어/영어 회화 앱")
@@ -128,12 +142,12 @@ with st.form(key='input_form'):
     
     submit_button = st.form_submit_button(label='예문 생성')
 
-# 대화 내용 다운로드 버튼
-if st.button("대화 내용 다운로드"):
+# 대화 내용 저장 및 열기 버튼
+if st.button("대화 내용 저장 및 열기"):
     download_conversation()
 
 if submit_button and place and situation and role and level:
-    st.session_state.selected_level = level  # 선택된 레벨을 세션 상태에 저장
+    st.session_state.selected_level = level
     with st.spinner('예문을 작성 중입니다...'):
         query_for_questions = f"""다음 시나리오에 맞는 한국어 {'질문 10개' if question_type == '질문' else '질문 5개와 그에 대한 답변'}를 생성하고 {language}로 번역해주세요:
                                 장소: {place}
@@ -147,15 +161,7 @@ if submit_button and place and situation and role and level:
                                 [번역된 {language}]
                                 {'[한국어 답변]' if question_type == '질문&답변' else ''}
                                 {'[번역된 ' + language + ' 답변]' if question_type == '질문&답변' else ''}
-                                
-                                주의사항:
-                                1. 번역 시 원문의 의미와 구조를 그대로 유지하세요.
-                                2. 추가적인 설명이나 확장을 하지 마세요.
-                                3. {level} 수준에 맞는 적절한 어휘를 사용하세요.
-                                4. 격식 용어 사용 시 과도하게 사용하지 마세요.
                                 """
-        
-        query_for_questions += f"다음 레벨 설명을 고려하세요: {LEVEL_DESCRIPTIONS[level]}"
         
         translated_questions = generate_content_anthropic(
             ANTHROPIC_MODEL_HAIKU, 
@@ -168,7 +174,12 @@ if submit_button and place and situation and role and level:
         )
         
         st.session_state.translated_questions = translated_questions
-        log_interaction(query_for_questions, st.session_state.translated_questions)
+        log_interaction({
+            'place': place,
+            'situation': situation,
+            'role': role,
+            'level': level
+        }, st.session_state.translated_questions)
 
 # 생성된 번역된 질문 출력
 if st.session_state.translated_questions:
