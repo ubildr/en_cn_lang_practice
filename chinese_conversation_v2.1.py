@@ -60,32 +60,38 @@ def generate_content_anthropic(model, query, max_tokens, temperature, language, 
     return response.content[0].text
 
 # 입력과 출력을 로그에 기록하는 함수
-def log_interaction(input_data, output_data):
+def log_interaction(input_data, output_data, language, use_formal_terms):
     log_entry = f"{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n"
     log_entry += f"입력:\n"
     log_entry += f"장소: {input_data['place']}\n"
     log_entry += f"상황: {input_data['situation']}\n"
     log_entry += f"역할: {input_data['role']}\n"
-    log_entry += f"레벨: {input_data['level']}\n\n"
-    log_entry += f"출력:\n{output_data}\n\n"
+    log_entry += f"레벨: {input_data['level']}\n"
+    log_entry += f"언어: {language}\n"
+    if language == '중국어':
+        log_entry += f"격식 용어 사용: {'예' if use_formal_terms else '아니오'}\n"
+    log_entry += f"\n출력:\n{output_data}\n\n"
     
     if 'log_content' not in st.session_state:
-        st.session_state.log_content = ""
-    st.session_state.log_content += log_entry
+        st.session_state.log_content = []
+    st.session_state.log_content.append(log_entry)
 
 # 대화 내용 다운로드 함수
 def download_conversation():
     if 'log_content' in st.session_state and st.session_state.log_content:
-        log_content = st.session_state.log_content
+        log_content = "\n".join(st.session_state.log_content)
     else:
         log_content = "로그가 아직 생성되지 않았습니다."
     
-    # 파일 다운로드 버튼 생성
+    current_time = datetime.now().strftime("%Y-%m-%d_%H%M")
+    file_name = f"conversation_log_{current_time}.txt"
+    
     st.download_button(
         label="대화 내용 다운로드",
         data=log_content,
-        file_name="conversation_log.txt",
-        mime="text/plain"
+        file_name=file_name,
+        mime="text/plain",
+        key="download_button"
     )
 
 # Streamlit 앱 레이아웃 설정
@@ -137,9 +143,6 @@ with st.form(key='input_form'):
     
     submit_button = st.form_submit_button(label='예문 생성')
 
-# 대화 내용 다운로드 버튼
-download_conversation()
-
 if submit_button and place and situation and role and level:
     st.session_state.selected_level = level
     with st.spinner('예문을 작성 중입니다...'):
@@ -173,8 +176,10 @@ if submit_button and place and situation and role and level:
             'situation': situation,
             'role': role,
             'level': level
-        }, st.session_state.translated_questions)
+        }, st.session_state.translated_questions, language, st.session_state.use_formal_terms)
 
-# 생성된 번역된 질문 출력
-if st.session_state.translated_questions:
+    # 생성된 번역된 질문 출력
     st.text_area("생성된 질문" if question_type == "질문" else "생성된 질문과 답변", st.session_state.translated_questions, height=400)
+
+# 대화 내용 다운로드 버튼
+download_conversation()
