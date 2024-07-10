@@ -80,18 +80,13 @@ def download_conversation():
     else:
         log_content = "로그가 아직 생성되지 않았습니다."
     
-    # 사용자의 문서 폴더 경로
-    documents_path = os.path.expanduser("~/Documents")
-    file_path = os.path.join(documents_path, "conversation_log.txt")
-    
-    # 파일에 로그 내용 추가 (이어쓰기)
-    with open(file_path, "a", encoding="utf-8") as f:
-        f.write(log_content)
-    
-    # 파일 열기
-    os.startfile(file_path)
-    
-    st.success(f"로그가 {file_path}에 저장되었고 자동으로 열렸습니다.")
+    # 파일 다운로드 버튼 생성
+    st.download_button(
+        label="대화 내용 다운로드",
+        data=log_content,
+        file_name="conversation_log.txt",
+        mime="text/plain"
+    )
 
 # Streamlit 앱 레이아웃 설정
 st.title("중국어/영어 회화 앱")
@@ -142,9 +137,8 @@ with st.form(key='input_form'):
     
     submit_button = st.form_submit_button(label='예문 생성')
 
-# 대화 내용 저장 및 열기 버튼
-if st.button("대화 내용 저장 및 열기"):
-    download_conversation()
+# 대화 내용 다운로드 버튼
+download_conversation()
 
 if submit_button and place and situation and role and level:
     st.session_state.selected_level = level
